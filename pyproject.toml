@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "personalize_options"
+version = "1.0.0"
+description = "Roles y permisos de lectura/escritura por opción para Django, con las opciones y los roles que haga falta, sin tocar código."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+authors = [{ name = "jurdin32", email = "jurdin32@users.noreply.github.com" }]
+keywords = ["django", "roles", "permisos", "seguridad", "acl"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: Django",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+# El paquete es una app de Django: no trae Django como dependencia, lo pone el
+# proyecto que lo usa (como cualquier app reutilizable).
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["Django>=4.2"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+personalize_options = ["py.typed", "migrations/*.py"]
