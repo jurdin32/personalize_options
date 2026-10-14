@@ -3,7 +3,9 @@
 Roles y permisos de **lectura** y **escritura** por opción, para el lado del
 cliente de una aplicación Django.
 
-* Los **roles** se crean desde el admin, los que haga falta y sin tocar código.
+* Las **opciones** —una por pantalla o apartado— y los **roles** se crean desde el
+  admin de Django o desde las pantallas que haga la aplicación, los que hagan falta
+  y sin tocar código.
 * Cada rol marca, **opción por opción**, si puede verla o verla y modificarla.
 * Si un usuario lleva varios roles, manda **el nivel más alto**.
 * La aplicación se protege de tres maneras: `request.permisos` en las vistas, los
@@ -54,24 +56,66 @@ Y migrar: los roles y los permisos son tablas del paquete.
 python manage.py migrate
 ```
 
-## Declarar las opciones
+## Las opciones
 
-Las opciones (una por pantalla o apartado del menú) se declaran en un solo sitio,
-`personalize_options/opciones.py`; de ahí salen las casillas del admin y las del
-menú. Cada opción es una clave (lo que se guarda y con lo que se pregunta) y un
-nombre (lo que se lee):
+Una opción es una pantalla o un apartado del menú (Clientes, Guías de remisión,
+Inventario…). Viven en la **base de datos** (tabla `personalize_options_opcion`), así
+que se crean, se renombran y se apagan desde el admin o desde las pantallas que haga
+la aplicación, **sin tocar código y sin migrar**. Lo que se guarda por rol es la
+clave de la opción (`clientes`) y su nivel; lo que no está marcado, no se puede.
+
+El paquete siembra las que trae de serie —`personalize_options.opciones.DE_SERIE`—
+con la migración de datos, para que un proyecto recién añadido tenga sus pantallas
+protegidas desde el primer día. Si la tabla todavía no existe (paquete sin migrar),
+el registro usa la lista de serie para no romper nada.
+
+Cada opción tiene su clave (con lo que se pregunta en el código), su nombre, su
+apartado y, si se quiere que salga en el menú, su dirección y su icono:
 
 ```python
-Opcion("clientes", "Clientes", "Catálogo"),
+from personalize_options.models import Opcion
+
+Opcion.objects.create(
+    clave="reportes",
+    nombre="Reportes de ventas",
+    grupo="Reportes",
+    url="/reportes/",          # para que salga en el menú
+    icono="chart-bar",
+    orden=20,
+)
 ```
 
-> La clave de una opción no se debe cambiar una vez en marcha: es lo que hay
-> guardado en los permisos de cada rol.
+Para leer el registro (estas funciones consultan la base):
 
-Añadir o quitar opciones **no necesita migración**: las opciones no son columnas de
-la base ni `choices` guardados, son esa lista. Lo que se guarda por rol es la clave
-(«clientes») y su nivel, y lo que no está marcado no se puede. El paquete lo
-comprueba en sus pruebas (`tests/test_migraciones.py`).
+```python
+from personalize_options.opciones import todas, grupos, por_clave, de, existe
+
+todas()          # todas, en orden
+todas(solo_activas=True)
+grupos()         # [(apartado, [opciones]), …], para pintar una matriz
+de("clientes")   # la opción de esa clave (KeyError si no está)
+existe("clientes")
+```
+
+> La clave de una opción no debería cambiarse una vez en marcha: es lo que hay
+> guardado en los permisos. Si se cambia, el paquete muda los permisos con ella; si
+> se borra la opción, sus permisos se van también.
+
+Para que una opción creada después salga sola en el menú, el menú del proyecto pide
+las que no pinta a mano:
+
+```django
+{% load personalize_options %}
+{% opciones_del_menu "Sistema" "configuracion roles usuarios opciones" as extras %}
+{% for o in extras %}
+  <li><a href="{{ o.url }}">{{ o.nombre }}</a></li>
+{% endfor %}
+
+{% apartados_nuevos "Resumen Facturar Comprobantes Catálogo Sistema" as apartados %}
+{% for apartado, opciones in apartados %}
+  <li><h3>{{ apartado }}</h3><ul>{% for o in opciones %}<li><a href="{{ o.url }}">{{ o.nombre }}</a></li>{% endfor %}</ul></li>
+{% endfor %}
+```
 
 ## Usarlo
 
@@ -146,6 +190,8 @@ El paquete registra sus dos tablas en el admin de Django, bajo
   y escritura o quitar todos los permisos a los roles que se seleccionen.
 * **Permisos** — la tabla tal cual, una fila por rol y opción, con el nivel editable
   en la propia lista y filtros por permiso y por rol.
+* **Opciones** — el catálogo de pantallas que se pueden permitir: se crean aquí, con
+  su apartado, su orden y, si llevan dirección, su sitio en el menú.
 
 Si un usuario no tiene ningún rol y el modo es `"abierto"`, puede todo; en
 `"cerrado"`, nada. Los superusuarios pueden todo salvo que se ponga

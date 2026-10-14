@@ -18,7 +18,9 @@ Se usa así:
 * ``personalize_options.permisos.de(usuario)`` — para el código que no tiene una
   petición.
 
-Las opciones se declaran en :mod:`personalize_options.opciones` (una por pantalla
-o apartado del menú) y los ajustes en ``settings.PERSONALIZE_OPTIONS`` (ver
-:mod:`personalize_options.conf`).
+Las opciones —una por pantalla o apartado del menú— viven en la base de datos, así
+que se crean y se cambian sin tocar código ni migrar: se ven en el admin
+(``personalize_options.Opcion``) y desde las pantallas que haga el proyecto con
+:mod:`personalize_options.opciones`. Los ajustes van en
+``settings.PERSONALIZE_OPTIONS`` (ver :mod:`personalize_options.conf`).
 """

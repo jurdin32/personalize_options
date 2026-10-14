@@ -13,12 +13,19 @@ from typing import Any
 
 from django import template
 
-from ..opciones import POR_CLAVE
+from .. import opciones as registro
 from ..permisos import de, de_la_peticion
 
 register = template.Library()
 
-__all__ = ["puede_leer", "puede_escribir", "opciones_visibles", "nombre_de"]
+__all__ = [
+    "puede_leer",
+    "puede_escribir",
+    "opciones_visibles",
+    "opciones_del_menu",
+    "apartados_nuevos",
+    "nombre_de",
+]
 
 
 def _quien(context: Any) -> Any:
@@ -58,7 +65,69 @@ def puede_escribir_de(usuario: Any, clave: str) -> bool:
     return de(usuario).puede_escribir(clave)
 
 
+def _activas(context: Any) -> Any:
+    """Las opciones activas, leídas una vez por petición (el menú las pide varias)."""
+    peticion = context.get("request")
+    guardadas = getattr(peticion, "_opciones_activas", None) if peticion else None
+    if guardadas is None:
+        guardadas = registro.todas(solo_activas=True)
+        if peticion is not None:
+            peticion._opciones_activas = guardadas
+    return guardadas
+
+
+@register.simple_tag(takes_context=True)
+def opciones_del_menu(context: Any, grupo: str, ya_pintadas: str = "") -> Any:
+    """Las opciones de un apartado que el menú puede pintar solo.
+
+    Son las que llevan dirección (``url``), están puestas en el menú, el usuario
+    puede ver y la plantilla no pinta a mano: así, una opción creada después —desde
+    la aplicación o el admin— sale en el menú sin tocar la plantilla.
+
+    ``ya_pintadas`` es la lista de claves que la plantilla ya dibuja en ese apartado,
+    separadas por espacios.
+    """
+    quien = _quien(context)
+    de_siempre = set(ya_pintadas.split())
+    return [
+        opcion
+        for opcion in _activas(context)
+        if opcion.grupo == grupo
+        and opcion.url
+        and opcion.en_menu
+        and opcion.clave not in de_siempre
+        and quien.puede_leer(opcion.clave)
+    ]
+
+
+@register.simple_tag(takes_context=True)
+def apartados_nuevos(context: Any, ya_pintados: str = "") -> Any:
+    """Los apartados que la plantilla del menú no conoce, con sus opciones.
+
+    Devuelve ``[(apartado, [opciones]), …]`` para los apartados que no estén en
+    ``ya_pintados``: si alguien crea un apartado nuevo desde la aplicación, sale en
+    el menú como uno más, sin tocar la plantilla.
+    """
+    conocidos = set(ya_pintados.split())
+    quien = _quien(context)
+    apartados = []
+    for grupo, opciones in registro.grupos(solo_activas=True):
+        if grupo in conocidos:
+            continue
+        visibles = [
+            opcion
+            for opcion in opciones
+            if opcion.en_menu and opcion.url and quien.puede_leer(opcion.clave)
+        ]
+        if visibles:
+            apartados.append((grupo, visibles))
+    return apartados
+
+
 @register.simple_tag
 def nombre_de(clave: str) -> str:
     """Cómo se llama una opción (por si hace falta en un aviso)."""
-    return POR_CLAVE[clave].nombre if clave in POR_CLAVE else clave
+    try:
+        return registro.de(clave).nombre
+    except KeyError:
+        return clave

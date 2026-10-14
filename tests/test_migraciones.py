@@ -16,7 +16,7 @@ from django.test import TestCase
 
 from personalize_options import migrations as las_migraciones
 from personalize_options.models import Permiso
-from personalize_options.opciones import POR_CLAVE
+from personalize_options.opciones import por_clave
 
 
 class PruebasDeLasMigraciones(TestCase):
@@ -55,4 +55,4 @@ class PruebasDeLasMigraciones(TestCase):
         )
 
         # Lo que se guarda es la clave de la opción, tal cual.
-        self.assertIn("clientes", POR_CLAVE)
+        self.assertIn("clientes", por_clave())

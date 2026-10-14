@@ -10,8 +10,8 @@ from typing import Any, Dict
 
 from django import forms
 
+from . import opciones
 from .models import Nivel, Permiso, Rol
-from .opciones import OPCIONES
 
 __all__ = ["SIN_ACCESO", "NIVELES", "CAMPO", "clave_de", "RolForm"]
 
@@ -44,7 +44,7 @@ class RolForm(forms.ModelForm):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         puestos: Dict[str, str] = self.instance.opciones if self.instance.pk else {}
-        for opcion in OPCIONES:
+        for opcion in opciones.todas(solo_activas=True):
             self.fields[f"{CAMPO}{opcion.clave}"] = forms.ChoiceField(
                 label=opcion.nombre,
                 choices=NIVELES,
@@ -65,7 +65,7 @@ class RolForm(forms.ModelForm):
 
     def guardar_los_permisos(self, rol: Rol) -> None:
         """Deja los permisos como se hayan marcado: lo no marcado se quita."""
-        for opcion in OPCIONES:
+        for opcion in opciones.todas():
             nivel = self.cleaned_data.get(f"{CAMPO}{opcion.clave}") or SIN_ACCESO
             if nivel:
                 Permiso.objects.update_or_create(

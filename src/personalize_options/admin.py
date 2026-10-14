@@ -11,11 +11,39 @@ from typing import Any, Optional, Tuple
 from django.contrib import admin
 from django.db.models import Count
 
+from . import opciones as registro
 from .forms import RolForm
-from .models import Nivel, Permiso, Rol
-from .opciones import GRUPOS, OPCIONES
+from .models import Nivel, Opcion, Permiso, Rol
 
-__all__ = ["RolAdmin", "PermisoAdmin"]
+__all__ = ["RolAdmin", "PermisoAdmin", "OpcionAdmin"]
+
+
+@admin.register(Opcion)
+class OpcionAdmin(admin.ModelAdmin):
+    """El catálogo de opciones: las pantallas que se pueden permitir o negar.
+
+    Se crean aquí (o desde la aplicación) y con eso ya salen en el asistente de los
+    roles y, si llevan dirección, en el menú. No hace falta tocar código ni migrar.
+    """
+
+    list_display = ("nombre", "grupo", "clave", "activo", "en_menu", "cuantos_permisos")
+    list_editable = ("activo",)
+    list_filter = ("grupo", "activo", "en_menu")
+    search_fields = ("clave", "nombre", "grupo")
+    ordering = ("orden", "nombre")
+    list_per_page = 50
+    prepopulated_fields = {"clave": ("nombre",)}
+    save_on_top = True
+
+    def get_queryset(self, request: Any) -> Any:
+        return super().get_queryset(request).annotate(
+            _permisos=Count("permisos", distinct=True)
+        )
+
+    @admin.display(description="Roles", ordering="_permisos")
+    def cuantos_permisos(self, obj: Opcion) -> int:
+        """En cuántos roles está marcada esta opción."""
+        return Permiso.objects.filter(opcion=obj.clave).count()
 
 
 @admin.register(Permiso)
@@ -90,7 +118,7 @@ class RolAdmin(admin.ModelAdmin):
             ]
             + [
                 (grupo, {"fields": tuple(f"nivel_{opcion.clave}" for opcion in opciones)})
-                for grupo, opciones in GRUPOS
+                for grupo, opciones in registro.grupos()
             ]
         )
 
@@ -106,7 +134,7 @@ class RolAdmin(admin.ModelAdmin):
 
     def _marcar(self, roles: Any, nivel: str) -> None:
         for rol in roles:
-            for opcion in OPCIONES:
+            for opcion in registro.todas():
                 Permiso.objects.update_or_create(
                     rol=rol, opcion=opcion.clave, defaults={"nivel": nivel}
                 )

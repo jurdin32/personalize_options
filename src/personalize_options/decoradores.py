@@ -24,8 +24,8 @@ from typing import Any, Callable
 
 from django.core.exceptions import PermissionDenied
 
+from . import opciones
 from .models import Nivel
-from .opciones import POR_CLAVE
 from .permisos import de_la_peticion
 
 __all__ = [
@@ -39,7 +39,10 @@ __all__ = [
 
 
 def _queja(clave: str, nivel: str) -> str:
-    nombre = POR_CLAVE[clave].nombre if clave in POR_CLAVE else clave
+    try:
+        nombre = opciones.de(clave).nombre
+    except KeyError:
+        nombre = clave
     if nivel == Nivel.ESCRITURA.value:
         return f"No tiene permiso para modificar «{nombre}»."
     return f"No tiene permiso para ver «{nombre}»."

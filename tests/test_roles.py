@@ -8,7 +8,7 @@ from django.test import TestCase
 
 from personalize_options.forms import RolForm
 from personalize_options.models import Nivel, Permiso, Rol
-from personalize_options.opciones import OPCIONES
+from personalize_options.opciones import todas
 
 from .comun import rol_con
 
@@ -121,7 +121,7 @@ class PruebasDelAdmin(TestCase):
     def test_la_pantalla_del_rol_trae_una_casilla_por_opcion(self) -> None:
         pagina = self.client.get("/admin/personalize_options/rol/add/").content.decode()
 
-        for opcion in OPCIONES:
+        for opcion in todas():
             self.assertIn(f'name="nivel_{opcion.clave}"', pagina, opcion.clave)
         self.assertIn("Sin acceso", pagina)
         self.assertIn("Lectura y escritura", pagina)
@@ -176,7 +176,7 @@ class PruebasDelAdmin(TestCase):
                     follow=True,
                 )
                 self.assertEqual(set(rol.opciones.values()), {esperado})
-                self.assertEqual(len(rol.opciones), len(OPCIONES))
+                self.assertEqual(len(rol.opciones), len(todas()))
 
         self.client.post(
             "/admin/personalize_options/rol/",

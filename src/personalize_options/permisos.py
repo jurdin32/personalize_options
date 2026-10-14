@@ -13,9 +13,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Set
 
-from . import conf
+from . import conf, opciones
 from .models import Nivel, Permiso, Rol
-from .opciones import OPCIONES, existe
 
 __all__ = ["Permisos", "de", "de_la_peticion", "PESO"]
 
@@ -35,6 +34,10 @@ class Permisos:
         self.autenticado = bool(getattr(usuario, "is_authenticated", False))
         self.superusuario = bool(getattr(usuario, "is_superuser", False))
         self._tiene_roles: Optional[bool] = None
+        # Las opciones se leen una vez: las de la base (o las de serie, si el
+        # paquete todavía no está migrado).
+        self._opciones = opciones.todas(solo_activas=True)
+        self._claves = {opcion.clave for opcion in self._opciones}
         self._niveles = self._resolver()
 
     # ------------------------------------------------------------ qué puede
@@ -52,7 +55,9 @@ class Permisos:
     @property
     def visibles(self) -> Set[str]:
         """Las claves de las opciones que puede leer (lo que enseña el menú)."""
-        return {opcion.clave for opcion in OPCIONES if self.puede_leer(opcion.clave)}
+        return {
+            opcion.clave for opcion in self._opciones if self.puede_leer(opcion.clave)
+        }
 
     @property
     def tiene_roles(self) -> bool:
@@ -74,7 +79,7 @@ class Permisos:
     def _alcanza(self, clave: str, nivel: str) -> bool:
         if not self.autenticado:
             return False
-        if not existe(clave):  # una clave que no es opción no se protege
+        if clave not in self._claves:  # una clave que no es opción no se protege
             return True
         if PESO.get(self.nivel(clave), 0) >= PESO[nivel]:
             return True
@@ -85,7 +90,7 @@ class Permisos:
         if not self.autenticado:
             return {}
         if self.superusuario and conf.superusuarios_todo():
-            return {opcion.clave: Nivel.ESCRITURA.value for opcion in OPCIONES}
+            return {opcion.clave: Nivel.ESCRITURA.value for opcion in self._opciones}
 
         filas = Permiso.objects.filter(
             rol__activo=True, rol__usuarios=self.usuario

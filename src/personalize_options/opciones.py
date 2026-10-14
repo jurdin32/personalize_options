@@ -1,80 +1,130 @@
 """Las opciones de la aplicación: lo que se puede permitir o negar.
 
-Una opción es una pantalla o un apartado del menú. Se declaran aquí, en un solo
-sitio, y de aquí salen los permisos que se marcan en cada rol y las opciones que
-enseña el menú. La clave es lo que se guarda; para que el menú y las vistas hablen
-el mismo idioma, conviene no cambiarla una vez en marcha.
+Una opción es una pantalla o un apartado del menú. Viven en la **base de datos**
+(la tabla ``personalize_options_opcion``), así que se pueden crear, renombrar o
+apagar desde la aplicación o desde el admin, sin tocar código y sin migrar. De aquí
+salen los permisos que se marcan en cada rol y las opciones que enseña el menú.
+
+Las de serie —``DE_SERIE``, más abajo— son las que siembra la migración de datos al
+instalar el paquete: sirven para que un proyecto recién añadido tenga sus pantallas
+protegidas desde el primer día. Si la tabla todavía no existe (por estar sin migrar),
+se usan éstas, para que la aplicación no se rompa.
+
+La clave es lo que se guarda; para que el menú y las vistas hablen el mismo idioma,
+conviene no cambiarla una vez en marcha.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 __all__ = [
-    "Opcion",
-    "OPCIONES",
-    "POR_CLAVE",
-    "GRUPOS",
-    "opciones_de_choices",
-    "existe",
+    "OpcionDeSerie",
+    "DE_SERIE",
+    "todas",
+    "grupos",
+    "por_clave",
     "de",
+    "existe",
+    "opciones_de_choices",
 ]
 
 
 @dataclass(frozen=True)
-class Opcion:
-    """Una pantalla o apartado de la aplicación."""
+class OpcionDeSerie:
+    """Una de las opciones que trae el paquete de serie."""
 
     clave: str
     nombre: str
     grupo: str
 
-    def __str__(self) -> str:
-        return f"{self.grupo} · {self.nombre}"
 
-
-#: Las opciones de la aplicación, en el orden del menú.
-OPCIONES: Tuple[Opcion, ...] = (
-    Opcion("tablero", "Tablero", "Resumen"),
-    Opcion("facturar", "Nueva factura", "Facturar"),
-    Opcion("facturas", "Facturas emitidas", "Facturar"),
-    Opcion("notas_credito", "Notas de crédito", "Comprobantes"),
-    Opcion("notas_debito", "Notas de débito", "Comprobantes"),
-    Opcion("liquidaciones_compra", "Liquidaciones de compra", "Comprobantes"),
-    Opcion("guias_remision", "Guías de remisión", "Comprobantes"),
-    Opcion("retenciones", "Retenciones", "Comprobantes"),
-    Opcion("productos", "Productos y servicios", "Catálogo"),
-    Opcion("clientes", "Clientes", "Catálogo"),
-    Opcion("conductores", "Conductores", "Catálogo"),
-    Opcion("vehiculos", "Vehículos", "Catálogo"),
-    Opcion("inventario", "Inventario", "Catálogo"),
-    Opcion("configuracion", "Configuración del SRI", "Sistema"),
-    # Las pantallas de la seguridad: crear roles y dárselos a la gente.
-    Opcion("roles", "Roles y permisos", "Sistema"),
-    Opcion("usuarios", "Usuarios y sus roles", "Sistema"),
-)
-
-#: La opción de cada clave.
-POR_CLAVE: Dict[str, Opcion] = {opcion.clave: opcion for opcion in OPCIONES}
-
-#: Las opciones por apartado, en el orden en que se declararon.
-GRUPOS: Tuple[Tuple[str, Tuple[Opcion, ...]], ...] = tuple(
-    (grupo, tuple(opcion for opcion in OPCIONES if opcion.grupo == grupo))
-    for grupo in dict.fromkeys(opcion.grupo for opcion in OPCIONES)
+#: Las opciones que siembra la migración de datos, en el orden del menú.
+DE_SERIE: Tuple[OpcionDeSerie, ...] = (
+    OpcionDeSerie("tablero", "Tablero", "Resumen"),
+    OpcionDeSerie("facturar", "Nueva factura", "Facturar"),
+    OpcionDeSerie("facturas", "Facturas emitidas", "Facturar"),
+    OpcionDeSerie("notas_credito", "Notas de crédito", "Comprobantes"),
+    OpcionDeSerie("notas_debito", "Notas de débito", "Comprobantes"),
+    OpcionDeSerie("liquidaciones_compra", "Liquidaciones de compra", "Comprobantes"),
+    OpcionDeSerie("guias_remision", "Guías de remisión", "Comprobantes"),
+    OpcionDeSerie("retenciones", "Retenciones", "Comprobantes"),
+    OpcionDeSerie("productos", "Productos y servicios", "Catálogo"),
+    OpcionDeSerie("clientes", "Clientes", "Catálogo"),
+    OpcionDeSerie("conductores", "Conductores", "Catálogo"),
+    OpcionDeSerie("vehiculos", "Vehículos", "Catálogo"),
+    OpcionDeSerie("inventario", "Inventario", "Catálogo"),
+    OpcionDeSerie("configuracion", "Configuración del SRI", "Sistema"),
+    OpcionDeSerie("roles", "Roles y permisos", "Sistema"),
+    OpcionDeSerie("usuarios", "Usuarios y sus roles", "Sistema"),
+    OpcionDeSerie("opciones", "Opciones de la aplicación", "Sistema"),
 )
 
 
-def opciones_de_choices() -> List[Tuple[str, str]]:
-    """Las opciones como ``choices`` de un campo (agrupadas por apartado)."""
-    return [(opcion.clave, str(opcion)) for opcion in OPCIONES]
+def _modelo() -> Any:
+    """El modelo de las opciones.
+
+    Se importa al usarlo porque ``models.py`` usa este módulo: traerlo aquí arriba
+    sería un círculo.
+    """
+    from .models import Opcion
+
+    return Opcion
+
+
+def _las_de_serie() -> List[OpcionDeSerie]:
+    """Las de serie, listas para usar si la tabla todavía no está."""
+    return list(DE_SERIE)
+
+
+def todas(solo_activas: bool = False) -> List[Any]:
+    """Las opciones de la aplicación, en orden.
+
+    Si la tabla no existe (paquete recién añadido, sin migrar), devuelve las de
+    serie: la aplicación sigue funcionando y protege sus pantallas.
+    """
+    from django.db.utils import DatabaseError, OperationalError, ProgrammingError
+
+    try:
+        consulta = _modelo().objects.all()
+        if solo_activas:
+            consulta = consulta.filter(activo=True)
+        return list(consulta)
+    except (DatabaseError, OperationalError, ProgrammingError):
+        return _las_de_serie()
+
+
+def grupos(solo_activas: bool = False) -> List[Tuple[str, List[Any]]]:
+    """Las opciones por apartado, en el orden en que aparecen.
+
+    El primer apartado es el de la primera opción, y así: el orden lo lleva el campo
+    ``orden`` de cada opción, que es lo que se ve en el menú y en el asistente.
+    """
+    por_apartado: Dict[str, List[Any]] = {}
+    for opcion in todas(solo_activas=solo_activas):
+        por_apartado.setdefault(opcion.grupo, []).append(opcion)
+    return list(por_apartado.items())
+
+
+def por_clave(solo_activas: bool = False) -> Dict[str, Any]:
+    """La opción de cada clave."""
+    return {opcion.clave: opcion for opcion in todas(solo_activas=solo_activas)}
 
 
 def existe(clave: str) -> bool:
     """¿Esa clave es una opción de la aplicación?"""
-    return clave in POR_CLAVE
+    return clave in por_clave()
 
 
-def de(clave: str) -> Opcion:
+def de(clave: str) -> Any:
     """La opción de esa clave (lanza ``KeyError`` si no existe)."""
-    return POR_CLAVE[clave]
+    encontrada = por_clave().get(clave)
+    if encontrada is None:
+        raise KeyError(clave)
+    return encontrada
+
+
+def opciones_de_choices() -> List[Tuple[str, str]]:
+    """Las opciones como ``choices`` de un campo (con el apartado delante)."""
+    return [(opcion.clave, str(opcion)) for opcion in todas()]

@@ -9,7 +9,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from personalize_options import conf, permisos
 from personalize_options.middleware import PermisosMiddleware
 from personalize_options.models import Nivel
-from personalize_options.opciones import OPCIONES
+from personalize_options.opciones import todas
 
 from .comun import CERRADO, SIN_ROLES, rol_con
 
@@ -25,7 +25,7 @@ class PruebasDeLaResolucion(TestCase):
         quien = permisos.de(self.usuario)
 
         self.assertTrue(quien.puede_escribir("clientes"))
-        self.assertEqual(quien.visibles, {opcion.clave for opcion in OPCIONES})
+        self.assertEqual(quien.visibles, {opcion.clave for opcion in todas()})
 
     @override_settings(PERSONALIZE_OPTIONS=CERRADO)
     def test_en_modo_cerrado_quien_no_tiene_rol_no_puede_nada(self) -> None:
