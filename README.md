@@ -12,7 +12,8 @@ los roles que hagan falta y sin tocar código.
 - Si un usuario lleva varios roles, manda **el nivel más alto**.
 - La aplicación se protege en tres sitios: `request.permisos` en las vistas, los
   decoradores `@requiere_lectura` / `@requiere_escritura`, y las etiquetas
-  `{% puede_leer %}` / `{% puede_escribir %}` en las plantillas —y el menú, con
+  `{% puede_leer %}` / `{% puede_escribir %}` en las plantillas (con `as` si van
+  dentro de un `{% if %}`, ver más abajo) —y el menú, con
   `{% opciones_visibles %}`—.
 - Es una app de Django normal: **trae sus migraciones**, así que en el proyecto solo
   hay que añadirlo y migrar.
@@ -140,29 +141,47 @@ la migración de datos. Si la tabla todavía no existe (paquete sin migrar), el 
 usa esa lista para no romper nada.
 
 Cada opción tiene su clave (con lo que se pregunta en el código), su nombre, su
-apartado y, si se quiere que salga en el menú, su dirección y su icono:
+**categoría** y, si se quiere que salga en el menú, su dirección y su icono:
 
 ```python
-from personalize_options.models import Opcion
+from personalize_options.models import Categoria, Opcion
+
+reportes = Categoria.objects.get_or_create(
+    nombre="Reportes",
+    defaults={"descripcion": "Los reportes y las estadísticas", "orden": 60, "icono": "charts"},
+)[0]
 
 Opcion.objects.create(
     clave="reportes",
     nombre="Reportes de ventas",
-    grupo="Reportes",
+    categoria=reportes,
     url="/reportes/",          # para que salga en el menú
     icono="chart-bar",
     orden=20,
 )
 ```
 
+### Las categorías de permisos
+
+Una **categoría** agrupa las opciones para repartirlas por roles: es lo que en el
+asistente del rol separa «Ventas» de «Contabilidad» y lo que en el menú hace de
+apartado. Se crean, se renombran y se ordenan desde el admin o desde la aplicación,
+sin tocar código, y en cuanto se les pone una opción dentro salen en los dos sitios.
+
+El campo `Opcion.grupo` sigue existiendo para que el menú de los proyectos no se
+toque: al guardar, se copia solo del nombre de la categoría. Si una opción llega con
+el apartado escrito y sin categoría —lo que hacen las migraciones de los proyectos—,
+el paquete le busca su categoría por el nombre.
+
 Para leer el registro (estas funciones consultan la base):
 
 ```python
-from personalize_options.opciones import todas, grupos, por_clave, de, existe
+from personalize_options.opciones import categorias, todas, grupos, por_clave, de, existe
 
 todas()                    # todas, en orden
 todas(solo_activas=True)   # sin las apagadas
-grupos()                   # [(apartado, [opciones]), …], para pintar una matriz
+categorias()               # las categorías de permisos, en su orden
+grupos()                   # [(categoría, [opciones]), …], para pintar una matriz
 por_clave()                # {clave: opción}
 de("clientes")             # la opción de esa clave (KeyError si no está)
 existe("clientes")
