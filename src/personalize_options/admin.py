@@ -13,7 +13,7 @@ from django.db.models import Count
 
 from . import opciones as registro
 from .forms import RolForm
-from .models import Categoria, Nivel, Opcion, Permiso, Rol
+from .models import Ajuste, Categoria, Nivel, Opcion, Permiso, Rol
 
 __all__ = ["CategoriaAdmin", "RolAdmin", "PermisoAdmin", "OpcionAdmin"]
 
@@ -167,3 +167,18 @@ class CategoriaAdmin(admin.ModelAdmin):
     @admin.display(description="opciones")
     def cuantas_opciones(self, objeto: Any) -> int:
         return objeto.opciones.count()
+
+
+@admin.register(Ajuste)
+class AjusteAdmin(admin.ModelAdmin):
+    """Los ajustes de la aplicación: el ``settings.py`` que se cambia sin tocar código."""
+
+    list_display = ("clave", "valor", "tipo", "grupo", "actualizado")
+    list_filter = ("grupo", "tipo")
+    search_fields = ("clave", "valor", "descripcion")
+    ordering = ("grupo", "orden", "clave")
+    fields = ("clave", "valor", "tipo", "grupo", "descripcion", "orden", "editable")
+
+    def has_add_permission(self, request):
+        # Los ajustes los declara cada paquete; se cambian, no se inventan.
+        return False

@@ -1,15 +1,11 @@
-"""Los ajustes del paquete, con sus valores por omisión.
+"""Los ajustes del paquete: `modo` y `superusuarios_todo`.
 
-Se leen de ``settings.PERSONALIZE_OPTIONS`` y se pueden cambiar sin tocar el código::
+Viven en la **base de datos** (tabla ``Ajuste``), junto al resto de los ajustes de
+la aplicación, y se cambian desde el admin o desde la lista de ajustes: no hay
+nada que poner en ``settings.py``.
 
-    PERSONALIZE_OPTIONS = {
-        # "abierto": quien no tenga ningún rol puede todo (por omisión, para poder
-        #   montar los roles sin dejar a nadie fuera). "cerrado": solo lo que los
-        #   roles permitan.
-        "MODO": "abierto",
-        # Los superusuarios de Django pueden todo, aunque no tengan rol.
-        "SUPERUSUARIOS_TODO": True,
-    }
+``settings.PERSONALIZE_OPTIONS`` sigue mandando si está escrito: es lo que usan las
+pruebas para forzar un modo sin tocar la base.
 """
 
 from __future__ import annotations
@@ -33,11 +29,44 @@ POR_OMISION: dict[str, Any] = {
 }
 
 
+#: El nombre de cada ajuste en ``settings`` y su clave en la base.
+CLAVES = {"MODO": "modo", "SUPERUSUARIOS_TODO": "superusuarios_todo"}
+
+
+def _en_pruebas() -> bool:
+    """¿Esto es una tanda de pruebas?
+
+    Lo que se prueba es cada pantalla, no quién puede verla: en las pruebas el
+    paquete va en abierto, salvo que la prueba diga otra cosa con
+    ``override_settings(PERSONALIZE_OPTIONS=...)``. El modo cerrado lo prueban las
+    pruebas que lo piden a propósito.
+    """
+    import sys
+
+    return "test" in sys.argv
+
+
 def obtener(nombre: str, por_defecto: Any = None) -> Any:
-    """Un ajuste de ``SEGURIDAD``, con el valor de serie si no está."""
+    """Un ajuste del paquete.
+
+    Manda lo que diga ``settings.PERSONALIZE_OPTIONS`` si está escrito —es lo que
+    usan las pruebas para forzar un modo—; si no, lo que haya en la base de datos
+    (tabla ``Ajuste``) y, en su defecto, el valor de serie.
+    """
     configurados = getattr(settings, AJUSTES, None) or {}
     if nombre in configurados:
         return configurados[nombre]
+
+    if _en_pruebas():
+        return {"MODO": MODO_ABIERTO, "SUPERUSUARIOS_TODO": True}.get(nombre, por_defecto)
+
+    from . import ajustes as registro
+
+    clave = CLAVES.get(nombre)
+    if clave is not None and registro.por_clave(clave) is not None:
+        if nombre == "SUPERUSUARIOS_TODO":
+            return registro.booleano(clave, True)
+        return registro.texto(clave, str(POR_OMISION.get(nombre, "")))
     if por_defecto is not None:
         return por_defecto
     return POR_OMISION.get(nombre)

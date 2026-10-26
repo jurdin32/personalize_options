@@ -21,7 +21,7 @@ from django.dispatch import receiver
 
 from . import opciones as registro
 
-__all__ = ["Categoria", "Opcion", "Nivel", "Rol", "Permiso", "validar_opcion"]
+__all__ = ["Ajuste", "Categoria", "Opcion", "Nivel", "Rol", "Permiso", "validar_opcion"]
 
 
 def validar_opcion(clave: str) -> None:
@@ -170,6 +170,65 @@ class Opcion(models.Model):
         super().save(*args, **kwargs)
         if anterior and anterior != self.clave:
             Permiso.objects.filter(opcion=anterior).update(opcion=self.clave)
+
+
+class Ajuste(models.Model):
+    """Un ajuste de la aplicación: lo que antes iba en ``settings.py``.
+
+    Cada paquete declara los suyos con su valor de serie (ver
+    :mod:`personalize_options.ajustes`) y la tabla los guarda. Se cambian desde el
+    admin o desde la aplicación y valen al momento, sin tocar código ni reiniciar.
+    """
+
+    class Tipo(models.TextChoices):
+        TEXTO = "texto", "Texto"
+        ENTERO = "entero", "Número entero"
+        BOOLEANO = "booleano", "Sí o no"
+        LISTA = "lista", "Lista separada por comas"
+
+    clave = models.SlugField(
+        "clave",
+        max_length=60,
+        unique=True,
+        help_text="Con lo que se lee en el código: bloqueo_inactividad_minutos…",
+    )
+    valor = models.TextField("valor", blank=True)
+    tipo = models.CharField("tipo", max_length=10, choices=Tipo.choices, default=Tipo.TEXTO)
+    grupo = models.CharField(
+        "grupo", max_length=40, blank=True, help_text="Para agruparlos en el admin."
+    )
+    descripcion = models.CharField(
+        "descripción", max_length=220, blank=True, help_text="Para qué es este ajuste."
+    )
+    orden = models.PositiveIntegerField("orden", default=0)
+    editable = models.BooleanField(
+        "editable",
+        default=True,
+        help_text="Los que no lo son sólo los pone el paquete que los declara.",
+    )
+    actualizado = models.DateTimeField("actualizado", auto_now=True)
+
+    class Meta:
+        verbose_name = "ajuste"
+        verbose_name_plural = "ajustes"
+        ordering = ["grupo", "orden", "clave"]
+
+    def __str__(self) -> str:
+        return f"{self.clave} = {self.valor}"
+
+    @property
+    def como_valor(self) -> Any:
+        """El valor con su tipo: número, sí/no, lista o texto."""
+        if self.tipo == self.Tipo.BOOLEANO:
+            return str(self.valor).strip().lower() in ("1", "si", "sí", "true", "on", "yes")
+        if self.tipo == self.Tipo.ENTERO:
+            try:
+                return int(str(self.valor).strip())
+            except (TypeError, ValueError):
+                return 0
+        if self.tipo == self.Tipo.LISTA:
+            return tuple(pieza.strip() for pieza in str(self.valor).split(",") if pieza.strip())
+        return self.valor
 
 
 class Nivel(models.TextChoices):

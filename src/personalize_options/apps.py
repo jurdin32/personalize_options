@@ -21,3 +21,15 @@ class PersonalizeOptionsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "personalize_options"
     verbose_name = "Seguridad (roles y permisos)"
+
+    def ready(self) -> None:
+        """Deja sembrados los ajustes cada vez que se migra.
+
+        Cada paquete declara los suyos en su propio ``ready()``; el que se ejecuta
+        después de ``migrate`` los guarda todos en la tabla ``Ajuste``.
+        """
+        from django.db.models.signals import post_migrate
+
+        from .ajustes import sembrar_al_migrar
+
+        post_migrate.connect(sembrar_al_migrar, sender=self, dispatch_uid="personalize_options.ajustes")
