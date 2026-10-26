@@ -13,9 +13,9 @@ from django.db.models import Count
 
 from . import opciones as registro
 from .forms import RolForm
-from .models import Nivel, Opcion, Permiso, Rol
+from .models import Categoria, Nivel, Opcion, Permiso, Rol
 
-__all__ = ["RolAdmin", "PermisoAdmin", "OpcionAdmin"]
+__all__ = ["CategoriaAdmin", "RolAdmin", "PermisoAdmin", "OpcionAdmin"]
 
 
 @admin.register(Opcion)
@@ -26,9 +26,9 @@ class OpcionAdmin(admin.ModelAdmin):
     roles y, si llevan dirección, en el menú. No hace falta tocar código ni migrar.
     """
 
-    list_display = ("nombre", "grupo", "clave", "activo", "en_menu", "cuantos_permisos")
+    list_display = ("nombre", "categoria", "clave", "activo", "en_menu", "cuantos_permisos")
     list_editable = ("activo",)
-    list_filter = ("grupo", "activo", "en_menu")
+    list_filter = ("categoria", "activo", "en_menu")
     search_fields = ("clave", "nombre", "grupo")
     ordering = ("orden", "nombre")
     list_per_page = 50
@@ -153,3 +153,17 @@ class RolAdmin(admin.ModelAdmin):
     def quitar_todo(self, request: Any, queryset: Any) -> None:
         Permiso.objects.filter(rol__in=queryset).delete()
         self.message_user(request, "Se quitaron todos los permisos de esos roles.")
+
+
+@admin.register(Categoria)
+class CategoriaAdmin(admin.ModelAdmin):
+    """Las categorías de permisos: cómo se agrupan las opciones en el asistente."""
+
+    list_display = ("nombre", "orden", "activa", "cuantas_opciones")
+    list_editable = ("orden", "activa")
+    search_fields = ("nombre", "descripcion")
+    ordering = ("orden", "nombre")
+
+    @admin.display(description="opciones")
+    def cuantas_opciones(self, objeto: Any) -> int:
+        return objeto.opciones.count()

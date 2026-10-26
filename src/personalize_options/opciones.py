@@ -23,6 +23,7 @@ __all__ = [
     "OpcionDeSerie",
     "DE_SERIE",
     "todas",
+    "categorias",
     "grupos",
     "por_clave",
     "de",
@@ -95,16 +96,40 @@ def todas(solo_activas: bool = False) -> List[Any]:
         return _las_de_serie()
 
 
-def grupos(solo_activas: bool = False) -> List[Tuple[str, List[Any]]]:
-    """Las opciones por apartado, en el orden en que aparecen.
+def categorias(solo_activas: bool = False) -> List[Any]:
+    """Las categorías de permisos, en su orden.
 
-    El primer apartado es el de la primera opción, y así: el orden lo lleva el campo
-    ``orden`` de cada opción, que es lo que se ve en el menú y en el asistente.
+    Si la tabla todavía no existe, devuelve una por cada apartado de las opciones de
+    serie: el asistente del rol se pinta igual.
     """
-    por_apartado: Dict[str, List[Any]] = {}
-    for opcion in todas(solo_activas=solo_activas):
-        por_apartado.setdefault(opcion.grupo, []).append(opcion)
-    return list(por_apartado.items())
+    from django.db.utils import DatabaseError, OperationalError, ProgrammingError
+
+    from .models import Categoria
+
+    try:
+        consulta = Categoria.objects.all()
+        if solo_activas:
+            consulta = consulta.filter(activa=True)
+        return list(consulta)
+    except (DatabaseError, OperationalError, ProgrammingError):
+        return []
+
+
+def grupos(solo_activas: bool = False) -> List[Tuple[str, List[Any]]]:
+    """Las opciones por **categoría**, en el orden de la categoría.
+
+    Dentro de cada categoría las opciones salen por su ``orden``, que es el mismo que
+    se ve en el menú; entre categorías manda el ``orden`` de la categoría. Las
+    opciones que no tengan categoría se agrupan por su apartado y van al final, para
+    que una opción vieja no se pierda por el camino.
+    """
+    por_categoria: Dict[str, List[Any]] = {}
+    ordenes: Dict[str, int] = {}
+    for opcion in sorted(todas(solo_activas=solo_activas), key=lambda o: o.orden):
+        nombre = opcion.categoria_nombre
+        por_categoria.setdefault(nombre, []).append(opcion)
+        ordenes[nombre] = min(ordenes.get(nombre, 10**6), opcion.categoria_orden)
+    return sorted(por_categoria.items(), key=lambda par: (ordenes[par[0]], par[0]))
 
 
 def por_clave(solo_activas: bool = False) -> Dict[str, Any]:

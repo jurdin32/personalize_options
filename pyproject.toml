@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "personalize_options"
-version = "1.0.0"
+version = "1.1.0"
 description = "Roles y permisos de lectura/escritura por opción para Django, con las opciones y los roles que haga falta, sin tocar código."
 readme = "README.md"
 license = "MIT"

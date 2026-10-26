@@ -21,13 +21,57 @@ from django.dispatch import receiver
 
 from . import opciones as registro
 
-__all__ = ["Opcion", "Nivel", "Rol", "Permiso", "validar_opcion"]
+__all__ = ["Categoria", "Opcion", "Nivel", "Rol", "Permiso", "validar_opcion"]
 
 
 def validar_opcion(clave: str) -> None:
     """Comprueba que la clave sea una de las opciones de la aplicación."""
     if not registro.existe(clave):
         raise ValidationError(f"«{clave}» no es una opción de la aplicación.")
+
+
+class Categoria(models.Model):
+    """Una categoría de permisos: agrupa las opciones para repartirlas por roles.
+
+    Es lo que en el asistente del rol separa «Ventas» de «Contabilidad», y lo que en
+    el menú hace de apartado. Se crean y se renombran desde la aplicación, sin tocar
+    código: una categoría nueva aparece en los dos sitios en cuanto se le pone una
+    opción dentro.
+    """
+
+    nombre = models.CharField("nombre", max_length=60, unique=True)
+    descripcion = models.CharField(
+        "descripción",
+        max_length=200,
+        blank=True,
+        help_text="Para qué es esta categoría: lo que se lee bajo el título.",
+    )
+    orden = models.PositiveSmallIntegerField(
+        "orden", default=100, help_text="Con qué orden sale entre las demás categorías."
+    )
+    icono = models.CharField(
+        "icono", max_length=40, blank=True, help_text="El del menú, sin el «mif-»."
+    )
+    activa = models.BooleanField(
+        "activa",
+        default=True,
+        help_text="Una categoría apagada no da permisos a las opciones que tenga.",
+    )
+    creado = models.DateTimeField("creada", auto_now_add=True)
+    actualizado = models.DateTimeField("actualizada", auto_now=True)
+
+    class Meta:
+        verbose_name = "categoría de permisos"
+        verbose_name_plural = "categorías de permisos"
+        ordering = ["orden", "nombre"]
+
+    def __str__(self) -> str:
+        return self.nombre
+
+    @property
+    def cuantas(self) -> int:
+        """Cuántas opciones tiene dentro."""
+        return self.opciones.count()
 
 
 class Opcion(models.Model):
@@ -46,10 +90,20 @@ class Opcion(models.Model):
         help_text="Con lo que se pregunta en el código: clientes, guias-remision…",
     )
     nombre = models.CharField("nombre", max_length=80)
+    categoria = models.ForeignKey(
+        Categoria,
+        verbose_name="categoría",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="opciones",
+        help_text="Con qué otras opciones se agrupa en el asistente del rol.",
+    )
     grupo = models.CharField(
         "apartado",
         max_length=40,
-        help_text="Bajo qué apartado sale en el menú: Catálogo, Comprobantes…",
+        blank=True,
+        help_text="Se copia de la categoría: es lo que lee el menú.",
     )
     orden = models.PositiveIntegerField(
         "orden", default=0, help_text="Con qué orden sale dentro de su apartado."
@@ -83,10 +137,31 @@ class Opcion(models.Model):
         ordering = ["orden", "nombre"]
 
     def __str__(self) -> str:
-        return f"{self.grupo} · {self.nombre}"
+        return f"{self.categoria_nombre} · {self.nombre}"
+
+    @property
+    def categoria_nombre(self) -> str:
+        """La categoría a la que pertenece (o el apartado suelto, si no tiene)."""
+        return self.categoria.nombre if self.categoria_id else self.grupo
+
+    @property
+    def categoria_orden(self) -> int:
+        """Con qué orden sale su categoría."""
+        return self.categoria.orden if self.categoria_id else 1000
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Si le cambian la clave, los permisos que había se van con ella."""
+        """Si le cambian la clave, los permisos que había se van con ella.
+
+        Además, el apartado se copia de la categoría: el menú sigue leyendo
+        ``grupo`` y no hay que tocar las plantillas.
+        """
+        if self.categoria_id:
+            self.grupo = self.categoria.nombre
+        elif self.grupo:
+            # Una opción que llega con el apartado escrito —lo que hacen las
+            # migraciones de los proyectos— busca su categoría por el nombre: así
+            # también cae donde tiene que caer.
+            self.categoria = Categoria.objects.filter(nombre=self.grupo).first()
         anterior = None
         if self.pk:
             anterior = (
