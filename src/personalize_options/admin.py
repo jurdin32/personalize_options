@@ -9,7 +9,8 @@ from __future__ import annotations
 from typing import Any, Optional, Tuple
 
 from django.contrib import admin
-from django.db.models import Count
+from django.db.models import Count, IntegerField, OuterRef, Subquery
+from django.db.models.functions import Coalesce
 
 from . import opciones as registro
 from .forms import RolForm
@@ -36,8 +37,19 @@ class OpcionAdmin(admin.ModelAdmin):
     save_on_top = True
 
     def get_queryset(self, request: Any) -> Any:
+        """Cuenta en cuántos roles está marcada cada opción.
+
+        El permiso guarda la **clave** de la opción en un ``CharField`` (no es una
+        foránea), así que el conteo va con una subconsulta y no con un ``JOIN``.
+        """
+        marcadas = (
+            Permiso.objects.filter(opcion=OuterRef("clave"))
+            .values("opcion")
+            .annotate(cuantos=Count("pk"))
+            .values("cuantos")
+        )
         return super().get_queryset(request).annotate(
-            _permisos=Count("permisos", distinct=True)
+            _permisos=Coalesce(Subquery(marcadas, output_field=IntegerField()), 0)
         )
 
     @admin.display(description="Roles", ordering="_permisos")
