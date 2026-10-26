@@ -9,7 +9,10 @@ la tabla ``Ajuste``. Así:
 * al terminar ``migrate`` se siembran los que falten (señal ``post_migrate``), sin
   pisar nunca un valor que ya esté puesto;
 * lo que se cambia desde el admin o desde la aplicación vale en todo el proyecto,
-  sin reiniciar.
+  sin reiniciar;
+* cada ajuste guarda de qué **paquete o aplicación** viene (``origen``), que se
+  toma de quien lo declara: así en la tabla se ve qué pone ``personalize_options``,
+  qué ``factec`` y qué cada aplicación del proyecto.
 
 Un ajuste que todavía no está en la base se lee de su valor de serie, así que el
 paquete funciona igual antes de migrar o si la tabla no existe.
@@ -18,7 +21,7 @@ paquete funciona igual antes de migrar o si la tabla no existe.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from typing import Any, Dict, Iterable, Iterator, Optional, Sequence, Tuple
 
@@ -52,6 +55,8 @@ class AjusteDeSerie:
     descripcion: str = ""
     orden: int = 0
     editable: bool = True
+    #: Quién lo declara. Vacío = se toma de quien llama a ``registrar()``.
+    origen: str = ""
 
 
 #: Los ajustes del propio paquete: cómo se comportan los permisos.
@@ -59,6 +64,7 @@ DE_SERIE: Tuple[AjusteDeSerie, ...] = (
     AjusteDeSerie(
         "modo",
         "abierto",
+        origen="personalize_options",
         grupo="Seguridad",
         orden=1,
         descripcion=(
@@ -71,6 +77,7 @@ DE_SERIE: Tuple[AjusteDeSerie, ...] = (
         "superusuarios_todo",
         "si",
         tipo="booleano",
+        origen="personalize_options",
         grupo="Seguridad",
         orden=2,
         descripcion="Los superusuarios de Django pueden todo, aunque no tengan rol.",
@@ -78,15 +85,43 @@ DE_SERIE: Tuple[AjusteDeSerie, ...] = (
 )
 
 #: Lo que han declarado los paquetes y las aplicaciones que están puestos.
-_REGISTRO: Dict[str, AjusteDeSerie] = {ajuste.clave: ajuste for ajuste in DE_SERIE}
+_REGISTRO: Dict[str, AjusteDeSerie] = {
+    ajuste.clave: replace(ajuste, origen=ajuste.origen or "personalize_options")
+    for ajuste in DE_SERIE
+}
 
 
 # ------------------------------------------------------------------ registro
 
 
+def _origen_de_quien_llama() -> str:
+    """El paquete o la aplicación desde donde se declara el ajuste.
+
+    Se mira la pila: el primer módulo que no sea este fichero. Así
+    ``factec.django.ajustes`` declara como «factec» y ``inventario.apps`` como
+    «inventario», sin tener que repetirlo en cada ajuste.
+    """
+    import sys
+
+    marco = sys._getframe(1)  # noqa: SLF001 - es la forma de saber quién llama
+    while marco is not None:
+        modulo = marco.f_globals.get("__name__", "")
+        if modulo and modulo != __name__:
+            return modulo.split(".")[0]
+        marco = marco.f_back
+    return ""
+
+
 def registrar(*nuevos: AjusteDeSerie) -> None:
-    """Declara ajustes. Se llama desde el ``ready()`` de cada aplicación."""
+    """Declara ajustes. Se llama desde el ``ready()`` de cada aplicación.
+
+    El origen se rellena solo con el paquete de quien declara; si se pasa a mano,
+    manda el que se pase.
+    """
+    origen = _origen_de_quien_llama()
     for ajuste in nuevos:
+        if not ajuste.origen and origen:
+            ajuste = replace(ajuste, origen=origen)
         _REGISTRO[ajuste.clave] = ajuste
     _leidos_de_la_base.cache_clear()
 
@@ -98,7 +133,15 @@ def por_clave(clave: str) -> Optional[AjusteDeSerie]:
 def todos() -> Sequence[AjusteDeSerie]:
     """Los ajustes declarados, ordenados como se enseñan."""
     return tuple(
-        sorted(_REGISTRO.values(), key=lambda ajuste: (ajuste.grupo, ajuste.orden, ajuste.clave))
+        sorted(
+            _REGISTRO.values(),
+            key=lambda ajuste: (
+                ajuste.origen,
+                ajuste.grupo,
+                ajuste.orden,
+                ajuste.clave,
+            ),
+        )
     )
 
 
@@ -217,6 +260,7 @@ def poner(clave: str, nuevo: Any) -> None:
         defaults={
             "valor": str(nuevo),
             "tipo": serie.tipo if serie else "texto",
+            "origen": serie.origen if serie else "",
             "grupo": serie.grupo if serie else "General",
             "descripcion": serie.descripcion if serie else "",
             "orden": serie.orden if serie else 0,
@@ -238,11 +282,23 @@ def sembrar(usando: str = "default") -> int:
     creados = 0
     for ajuste in _REGISTRO.values():
         if ajuste.clave in existentes:
+            # Ya está: se refresca lo que viene de la declaración —el origen, el
+            # tipo, el grupo, para qué sirve— pero **no** el valor, que es lo que
+            # alguien pudo cambiar.
+            Ajuste.objects.using(usando).filter(clave=ajuste.clave).update(
+                tipo=ajuste.tipo,
+                origen=ajuste.origen,
+                grupo=ajuste.grupo,
+                descripcion=ajuste.descripcion,
+                orden=ajuste.orden,
+                editable=ajuste.editable,
+            )
             continue
         Ajuste.objects.using(usando).create(
             clave=ajuste.clave,
             valor=ajuste.valor,
             tipo=ajuste.tipo,
+            origen=ajuste.origen,
             grupo=ajuste.grupo,
             descripcion=ajuste.descripcion,
             orden=ajuste.orden,

@@ -176,8 +176,10 @@ class Ajuste(models.Model):
     """Un ajuste de la aplicación: lo que antes iba en ``settings.py``.
 
     Cada paquete declara los suyos con su valor de serie (ver
-    :mod:`personalize_options.ajustes`) y la tabla los guarda. Se cambian desde el
-    admin o desde la aplicación y valen al momento, sin tocar código ni reiniciar.
+    :mod:`personalize_options.ajustes`) y la tabla los guarda. De la declaración
+    viene todo menos el **valor**: la clave, el tipo, el grupo, para qué sirve y
+    quién lo declara no se escriben a mano, así que no se editan; lo que se
+    cambia —desde el admin o desde la aplicación— es el valor.
     """
 
     class Tipo(models.TextChoices):
@@ -194,6 +196,12 @@ class Ajuste(models.Model):
     )
     valor = models.TextField("valor", blank=True)
     tipo = models.CharField("tipo", max_length=10, choices=Tipo.choices, default=Tipo.TEXTO)
+    origen = models.CharField(
+        "origen",
+        max_length=40,
+        blank=True,
+        help_text="El paquete o la aplicación que lo declara: sale de su declaración.",
+    )
     grupo = models.CharField(
         "grupo", max_length=40, blank=True, help_text="Para agruparlos en el admin."
     )
@@ -209,9 +217,9 @@ class Ajuste(models.Model):
     actualizado = models.DateTimeField("actualizado", auto_now=True)
 
     class Meta:
-        verbose_name = "ajuste"
-        verbose_name_plural = "ajustes"
-        ordering = ["grupo", "orden", "clave"]
+        verbose_name = "ajuste de la aplicación"
+        verbose_name_plural = "ajustes de la aplicación"
+        ordering = ["origen", "grupo", "orden", "clave"]
 
     def __str__(self) -> str:
         return f"{self.clave} = {self.valor}"

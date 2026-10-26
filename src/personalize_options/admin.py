@@ -183,14 +183,46 @@ class CategoriaAdmin(admin.ModelAdmin):
 
 @admin.register(Ajuste)
 class AjusteAdmin(admin.ModelAdmin):
-    """Los ajustes de la aplicación: el ``settings.py`` que se cambia sin tocar código."""
+    """Los ajustes de la aplicación: el ``settings.py`` que se cambia sin tocar código.
 
-    list_display = ("clave", "valor", "tipo", "grupo", "actualizado")
-    list_filter = ("grupo", "tipo")
-    search_fields = ("clave", "valor", "descripcion")
-    ordering = ("grupo", "orden", "clave")
-    fields = ("clave", "valor", "tipo", "grupo", "descripcion", "orden", "editable")
+    La clave **no** se edita: es la que lee el código. Tampoco el tipo, el grupo
+    ni la descripción, que vienen de la declaración del paquete y se refrescan al
+    migrar. Lo único que se escribe a mano es el **valor**, que es el ajuste.
+    """
+
+    list_display = ("clave", "origen", "grupo", "valor", "tipo", "actualizado")
+    list_filter = ("origen", "grupo", "tipo")
+    search_fields = ("clave", "valor", "descripcion", "origen")
+    ordering = ("origen", "grupo", "orden", "clave")
+    readonly_fields = (
+        "clave",
+        "origen",
+        "tipo",
+        "grupo",
+        "descripcion",
+        "orden",
+        "editable",
+        "actualizado",
+    )
+    fields = (
+        "clave",
+        "origen",
+        "grupo",
+        "tipo",
+        "descripcion",
+        "valor",
+        "orden",
+        "editable",
+        "actualizado",
+    )
+    list_display_links = ("clave",)
+    save_on_top = True
+    list_per_page = 100
 
     def has_add_permission(self, request):
         # Los ajustes los declara cada paquete; se cambian, no se inventan.
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Y tampoco se borran: volverían a aparecer al migrar.
         return False

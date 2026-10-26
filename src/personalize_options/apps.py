@@ -20,7 +20,7 @@ class PersonalizeOptionsConfig(AppConfig):
 
     default_auto_field = "django.db.models.BigAutoField"
     name = "personalize_options"
-    verbose_name = "Seguridad (roles y permisos)"
+    verbose_name = "Configuración y permisos"
 
     def ready(self) -> None:
         """Deja sembrados los ajustes cada vez que se migra.
