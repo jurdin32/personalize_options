@@ -12,6 +12,7 @@ from django.contrib import admin
 from django.db.models import Count, IntegerField, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 
+from . import ajustes
 from . import opciones as registro
 from .forms import RolForm
 from .models import Ajuste, Categoria, Nivel, Opcion, Permiso, Rol
@@ -226,3 +227,12 @@ class AjusteAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         # Y tampoco se borran: volverían a aparecer al migrar.
         return False
+
+    def save_model(self, request, obj, form, change):
+        """Al cambiar un ajuste se suelta lo leído, también en los demás workers.
+
+        Sin esto, cambiar ``MODO`` a cerrado —o cualquier otro ajuste— no surtía
+        efecto hasta reiniciar el proceso: la aplicación seguía con el valor viejo.
+        """
+        super().save_model(request, obj, form, change)
+        ajustes.olvidar_lo_leido()

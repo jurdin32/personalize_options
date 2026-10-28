@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.test import RequestFactory, TestCase, override_settings
@@ -77,9 +79,10 @@ class PruebasDeLaResolucion(TestCase):
         self.assertFalse(permisos.de(jefe).puede_leer("configuracion"))
 
     @override_settings(PERSONALIZE_OPTIONS=CERRADO)
-    def test_una_clave_que_no_es_opcion_no_se_protege(self) -> None:
-        # Si alguien se equivoca con el nombre en un decorador, no se cierra todo.
-        self.assertTrue(permisos.de(self.usuario).puede_escribir("lo-que-sea"))
+    def test_una_clave_que_no_es_opcion_se_niega(self) -> None:
+        # Una errata en el decorador cierra esa pantalla (y avisa en el registro):
+        # antes se dejaba pasar, así que el error desactivaba la protección.
+        self.assertFalse(permisos.de(self.usuario).puede_escribir("lo-que-sea"))
 
     @override_settings(PERSONALIZE_OPTIONS=SIN_ROLES)
     def test_sin_identificarse_no_se_puede_nada(self) -> None:
@@ -95,10 +98,14 @@ class PruebasDeLaResolucion(TestCase):
         self.assertTrue(conf.superusuarios_todo())
 
     def test_sin_ajustes_en_settings_se_usa_lo_de_serie(self) -> None:
-        with self.settings(PERSONALIZE_OPTIONS=None):
-            self.assertEqual(conf.modo(), conf.MODO_ABIERTO)
-        with self.settings(PERSONALIZE_OPTIONS={"MODO": "lo-que-sea"}):
-            self.assertEqual(conf.modo(), conf.MODO_ABIERTO)
+        # `_en_pruebas()` abre el paquete durante las pruebas: se apaga para mirar
+        # lo que vería una instalación de verdad.
+        with mock.patch("personalize_options.conf._en_pruebas", return_value=False):
+            with self.settings(PERSONALIZE_OPTIONS=None):
+                self.assertEqual(conf.modo(), conf.MODO_CERRADO)
+            # Un modo mal escrito también cierra: no puede abrirse por una errata.
+            with self.settings(PERSONALIZE_OPTIONS={"MODO": "lo-que-sea"}):
+                self.assertEqual(conf.modo(), conf.MODO_CERRADO)
 
 
 

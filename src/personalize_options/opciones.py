@@ -88,7 +88,9 @@ def todas(solo_activas: bool = False) -> List[Any]:
     from django.db.utils import DatabaseError, OperationalError, ProgrammingError
 
     try:
-        consulta = _modelo().objects.all()
+        # La categoría viaja en la misma consulta: el menú pregunta por su nombre
+        # y su orden en cada opción, y sin esto sería una consulta por opción.
+        consulta = _modelo().objects.select_related("categoria")
         if solo_activas:
             consulta = consulta.filter(activo=True)
         return list(consulta)

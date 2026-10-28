@@ -22,9 +22,10 @@ AJUSTES = "PERSONALIZE_OPTIONS"
 MODO_ABIERTO = "abierto"
 MODO_CERRADO = "cerrado"
 
-#: Los valores de serie.
+#: Los valores de serie. El modo de serie es cerrado: un producto que se vende no
+#: puede nacer dejando que cualquiera con sesión lo haga todo.
 POR_OMISION: dict[str, Any] = {
-    "MODO": MODO_ABIERTO,
+    "MODO": MODO_CERRADO,
     "SUPERUSUARIOS_TODO": True,
 }
 
@@ -73,9 +74,12 @@ def obtener(nombre: str, por_defecto: Any = None) -> Any:
 
 
 def modo() -> str:
-    """«abierto» o «cerrado» (lo que no se reconozca se toma como abierto)."""
-    valor = str(obtener("MODO", MODO_ABIERTO)).strip().lower()
-    return MODO_CERRADO if valor == MODO_CERRADO else MODO_ABIERTO
+    """«abierto» o «cerrado». Lo que no se reconozca se toma como **cerrado**.
+
+    Antes se tomaba como abierto: un valor mal escrito abría la aplicación entera.
+    """
+    valor = str(obtener("MODO", MODO_CERRADO)).strip().lower()
+    return MODO_ABIERTO if valor == MODO_ABIERTO else MODO_CERRADO
 
 
 def es_abierto() -> bool:

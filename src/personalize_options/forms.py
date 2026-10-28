@@ -64,12 +64,21 @@ class RolForm(forms.ModelForm):
         self.guardar_los_permisos(self.instance)
 
     def guardar_los_permisos(self, rol: Rol) -> None:
-        """Deja los permisos como se hayan marcado: lo no marcado se quita."""
-        for opcion in opciones.todas():
-            nivel = self.cleaned_data.get(f"{CAMPO}{opcion.clave}") or SIN_ACCESO
+        """Deja los permisos como se hayan marcado: lo no marcado se quita.
+
+        Solo se tocan las opciones que el formulario pintó (las activas): antes se
+        recorría la lista entera y las casillas de una opción desactivada no venían
+        en el envío, así que guardar cualquier rol **borraba** sus permisos; al
+        reactivar la opción, todos los roles se quedaban sin acceso.
+        """
+        incluidas = {
+            clave_de(nombre) for nombre in self.fields if nombre.startswith(CAMPO)
+        }
+        for clave in incluidas:
+            nivel = self.cleaned_data.get(f"{CAMPO}{clave}") or SIN_ACCESO
             if nivel:
                 Permiso.objects.update_or_create(
-                    rol=rol, opcion=opcion.clave, defaults={"nivel": nivel}
+                    rol=rol, opcion=clave, defaults={"nivel": nivel}
                 )
             else:
-                Permiso.objects.filter(rol=rol, opcion=opcion.clave).delete()
+                Permiso.objects.filter(rol=rol, opcion=clave).delete()

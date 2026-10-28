@@ -31,6 +31,7 @@ __all__ = [
     "booleano",
     "entero",
     "lista",
+    "olvidar_lo_leido",
     "poner",
     "registrar",
     "sembrar",
@@ -63,14 +64,14 @@ class AjusteDeSerie:
 DE_SERIE: Tuple[AjusteDeSerie, ...] = (
     AjusteDeSerie(
         "modo",
-        "abierto",
+        "cerrado",
         origen="personalize_options",
         grupo="Seguridad",
         orden=1,
         descripcion=(
+            "«cerrado»: solo se puede lo que permitan los roles (lo de serie). "
             "«abierto»: quien no tenga ningún rol puede todo, para montar la "
-            "seguridad sin dejar a nadie fuera. «cerrado»: solo se puede lo que "
-            "los roles permitan."
+            "seguridad sin dejar a nadie fuera de una instalación que ya existía."
         ),
     ),
     AjusteDeSerie(
@@ -180,6 +181,15 @@ def _leidos() -> Dict[str, str]:
     if _en_pruebas():
         _leidos_de_la_base.cache_clear()
     return _leidos_de_la_base()
+
+
+def olvidar_lo_leido() -> None:
+    """Suelta lo que se leyó de la tabla.
+
+    Se llama al guardar un ajuste en el admin: los valores viven en memoria por
+    proceso, y sin esto el cambio no se notaba hasta reiniciar el servicio.
+    """
+    _leidos_de_la_base.cache_clear()
 
 
 def _de_la_base() -> Dict[str, str]:

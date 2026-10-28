@@ -11,8 +11,11 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 AJUSTES = (
-    ("modo", "abierto", "texto", "Seguridad", 1,
-     "«abierto»: quien no tenga ningún rol puede todo. «cerrado»: solo lo que los roles permitan."),
+    # El modo de serie es «cerrado»: una instalación nueva solo deja hacer lo que
+    # permitan los roles (y los superusuarios). Las instalaciones que ya existían
+    # conservan el valor que tengan: esta migración no vuelve a correr.
+    ("modo", "cerrado", "texto", "Seguridad", 1,
+     "«cerrado»: solo lo que los roles permitan. «abierto»: quien no tenga ningún rol puede todo."),
     ("superusuarios_todo", "si", "booleano", "Seguridad", 2,
      "Los superusuarios de Django pueden todo, aunque no tengan rol."),
 )

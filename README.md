@@ -76,10 +76,10 @@ MIDDLEWARE = [
 ]
 
 PERSONALIZE_OPTIONS = {
-    # "abierto": quien no tenga ningún rol puede todo (es lo de serie, para poder
-    #   montar los roles sin dejar a nadie fuera). Cuando los roles estén puestos:
-    #   "cerrado", y entonces solo se puede lo que los roles permitan.
-    "MODO": "abierto",
+    # "cerrado" (lo de serie): solo se puede lo que permitan los roles, más los
+    #   superusuarios. "abierto": quien no tenga ningún rol puede todo, útil para
+    #   montar los roles en una instalación que ya estaba en marcha.
+    "MODO": "cerrado",
     # Los superusuarios de Django pueden todo, aunque no tengan ningún rol.
     "SUPERUSUARIOS_TODO": True,
 }

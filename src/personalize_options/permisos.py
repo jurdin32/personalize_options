@@ -11,12 +11,15 @@ están puestos, se cambia a ``"cerrado"`` y solo se puede lo que los roles permi
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Optional, Set
 
 from . import conf, opciones
 from .models import Nivel, Permiso, Rol
 
 __all__ = ["Permisos", "de", "de_la_peticion", "PESO"]
+
+logger = logging.getLogger(__name__)
 
 #: Peso de cada nivel, para quedarse con el más alto cuando hay varios roles.
 PESO: Dict[str, int] = {
@@ -79,8 +82,14 @@ class Permisos:
     def _alcanza(self, clave: str, nivel: str) -> bool:
         if not self.autenticado:
             return False
-        if clave not in self._claves:  # una clave que no es opción no se protege
-            return True
+        if clave not in self._claves:
+            # Una clave que no es opción (una errata en el decorador) **no** se
+            # deja pasar: antes se dejaba, así que una opción desactivada o mal
+            # escrita abría la pantalla a todo el mundo.
+            logger.warning(
+                "Se preguntó por la opción «%s», que no está declarada: se niega.", clave
+            )
+            return False
         if PESO.get(self.nivel(clave), 0) >= PESO[nivel]:
             return True
         return self.es_abierto
